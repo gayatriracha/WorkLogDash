@@ -1,6 +1,6 @@
 # Overview
 
-This is a work logging application built with React and Express that allows users to track their daily work activities in hourly time slots from 2:00 PM to 11:30 PM IST. The application features a modern, responsive interface built with shadcn/ui components, real-time audio notifications for work hour reminders, and comprehensive progress tracking. Users can log their work descriptions for each time slot, mark days as holidays, and view their productivity metrics through an intuitive dashboard.
+This is a work logging application built with React and Express that allows users to track their daily work activities with customizable work hours and time slots. The application features a modern, responsive interface built with shadcn/ui components, real-time audio notifications for work hour reminders, and comprehensive progress tracking. Users can log their work descriptions for each time slot, mark days as holidays, and view their productivity metrics through an intuitive dashboard.
 
 # User Preferences
 
@@ -32,7 +32,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Time Management System
 - **Time Zone**: India Standard Time (IST) as the primary timezone
-- **Work Hours**: Fixed schedule from 2:00 PM to 11:30 PM IST (11 time slots)
+- **Work Hours**: Customizable schedule with user-defined start/end times and slot durations
 - **Audio Notifications**: Web Audio API implementation with browser permission handling
 - **Real-time Updates**: Client-side time tracking with IST conversion utilities
 

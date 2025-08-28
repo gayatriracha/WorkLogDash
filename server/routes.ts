@@ -377,15 +377,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ).size;
       const workingDays = totalDays - holidayDays;
       
+      // Get user's slot duration for hour calculations
+      const userPreferences = await storage.getUserWorkPreferences(userId);
+      const slotDurationHours = userPreferences ? parseInt(userPreferences.slotDurationMinutes) / 60 : 1;
+      
       const productiveHours = workLogs.filter(
         log => !log.isHoliday && log.workDescription.trim() !== ""
-      ).length * 1; // Each slot is 1 hour (except 11:30 PM which is 0.5)
+      ).length * slotDurationHours;
       
-      // Adjust for 11:30 PM slots
-      const elevenThirtySlots = workLogs.filter(
-        log => !log.isHoliday && log.workDescription.trim() !== "" && log.timeSlot === "11:30 PM"
-      ).length;
-      const adjustedProductiveHours = productiveHours - (elevenThirtySlots * 0.5);
+      const adjustedProductiveHours = productiveHours;
 
       // Work area analysis
       const workAreas = new Map<string, number>();
@@ -642,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: day.date,
           totalHours: day.hours,
           completedSlots: Math.ceil(day.hours),
-          totalSlots: TIME_SLOTS.length,
+          totalSlots: userTimeSlots.length,
           completionPercentage: day.completionPercentage,
           workAreas: [], // Could be populated per day if needed
           keyAccomplishments: [],

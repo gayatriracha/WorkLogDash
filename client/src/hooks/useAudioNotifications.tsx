@@ -36,18 +36,10 @@ export function useAudioNotifications() {
     const [hours, minutes] = istTime.split(':').map(Number);
     const currentTimeKey = `${hours}:${minutes}`;
 
-    // Check for hourly notifications (on the hour during work time)
-    const isHourlyNotification = (
-      minutes === 0 && 
-      hours >= 14 && 
-      hours <= 23
-    );
-
-    // Special case for 11:30 PM
-    const isHalfHourNotification = (
-      minutes === 30 && 
-      hours === 23
-    );
+    // Audio notifications will be based on user's work preferences
+    // For now, disable automatic hourly notifications
+    const isHourlyNotification = false;
+    const isHalfHourNotification = false;
 
     if ((isHourlyNotification || isHalfHourNotification) && 
         lastNotificationTime !== currentTimeKey) {

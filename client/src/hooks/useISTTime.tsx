@@ -24,24 +24,10 @@ export function useISTTime() {
       const hours = istDate.getHours();
       const minutes = istDate.getMinutes();
 
-      // Check if it's work hours (2 PM to 11:30 PM IST)
-      const inWorkHours = (hours >= 14 && hours < 23) || (hours === 23 && minutes <= 30);
-      setIsWorkHours(inWorkHours);
-
-      // Determine current time slot
-      let currentSlot: string | null = null;
-      
-      if (inWorkHours) {
-        if (hours === 23 && minutes >= 30) {
-          currentSlot = "11:30 PM";
-        } else if (hours >= 14 && hours <= 22) {
-          const hour12 = hours > 12 ? hours - 12 : hours;
-          currentSlot = `${hour12}:00 PM`;
-        }
-      }
-
-      // Set the current slot (user preferences will validate this)
-      setCurrentTimeSlot(currentSlot);
+      // Work hours will be determined by user preferences
+      // For now, just set basic defaults
+      setIsWorkHours(true); // Always true since work hours are now customizable
+      setCurrentTimeSlot(null); // Will be determined by user's time slots
     };
 
     // Update immediately

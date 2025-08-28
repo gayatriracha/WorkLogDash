@@ -12,7 +12,7 @@ export default function Landing() {
           </div>
           <CardTitle className="text-2xl">Work Log Dashboard</CardTitle>
           <p className="text-muted-foreground">
-            Track your daily productivity from 2 PM to 11:30 PM IST
+            Track your daily productivity with customizable work hours
           </p>
         </CardHeader>
         <CardContent className="space-y-6">

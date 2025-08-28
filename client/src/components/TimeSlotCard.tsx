@@ -104,7 +104,7 @@ export default function TimeSlotCard({
               isCurrent ? "bg-accent text-accent-foreground animate-pulse" :
               "bg-muted text-muted-foreground"
             )}>
-              {timeSlot === '11:30 PM' ? '23:30' : get24HourFormat(timeSlot).split(':')[0]}
+              {get24HourFormat(timeSlot).split(':')[0]}
             </div>
             <div>
               <h3 className="font-semibold text-foreground">{timeSlot}</h3>
