@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -21,28 +21,53 @@ export default function TimeSlotCard({
 }: TimeSlotCardProps) {
   const [localDescription, setLocalDescription] = useState(workLog?.workDescription || '');
   const [isDirty, setIsDirty] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isCompleted = !isHoliday && workLog?.workDescription?.trim() !== '';
+
+  // Update local state when workLog changes
+  useEffect(() => {
+    setLocalDescription(workLog?.workDescription || '');
+  }, [workLog?.workDescription]);
 
   const handleTextChange = useCallback((value: string) => {
     setLocalDescription(value);
     setIsDirty(true);
     
-    // Debounced save
-    const timeoutId = setTimeout(() => {
+    // Clear existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Set new timeout for debounced save
+    timeoutRef.current = setTimeout(() => {
       onUpdate(value);
       setIsDirty(false);
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
+      timeoutRef.current = null;
+    }, 2000); // Increased to 2 seconds
   }, [onUpdate]);
 
   const handleBlur = useCallback(() => {
+    // Clear timeout if user clicks away
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
     if (isDirty) {
       onUpdate(localDescription);
       setIsDirty(false);
     }
   }, [isDirty, localDescription, onUpdate]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Convert time slot to 24-hour format for display
   const get24HourFormat = (timeSlot: string) => {
