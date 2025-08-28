@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { TIME_SLOTS } from "@shared/schema";
 
 export function useISTTime() {
   const [currentTime, setCurrentTime] = useState('');
@@ -41,12 +40,8 @@ export function useISTTime() {
         }
       }
 
-      // Verify the slot exists in our TIME_SLOTS array
-      if (currentSlot && TIME_SLOTS.includes(currentSlot as any)) {
-        setCurrentTimeSlot(currentSlot);
-      } else {
-        setCurrentTimeSlot(null);
-      }
+      // Set the current slot (user preferences will validate this)
+      setCurrentTimeSlot(currentSlot);
     };
 
     // Update immediately

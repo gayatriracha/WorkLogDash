@@ -15,9 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { TIME_SLOTS } from "@shared/schema";
 import { formatISO } from "date-fns";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Settings } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -47,7 +47,7 @@ export default function Dashboard() {
   
   // Calculate progress
   const completedSlots = workLogs.filter(log => !log.isHoliday && log.workDescription.trim() !== '').length;
-  const totalSlots = TIME_SLOTS.length;
+  const totalSlots = workLogs.length || 1; // Avoid division by zero
   const progressPercentage = Math.round((completedSlots / totalSlots) * 100);
 
   const handleHolidayToggle = async (checked: boolean) => {
@@ -99,6 +99,17 @@ export default function Dashboard() {
                   {(user as any)?.firstName || (user as any)?.email || 'User'}
                 </span>
               </div>
+              <Link href="/preferences">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                  data-testid="preferences-button"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </Button>
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
@@ -189,18 +200,17 @@ export default function Dashboard() {
 
                 {/* Time Slots Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {TIME_SLOTS.map((timeSlot) => {
-                    const workLog = workLogs.find(log => log.timeSlot === timeSlot);
-                    const isCurrent = currentTimeSlot === timeSlot && isWorkHours;
+                  {workLogs.map((workLog) => {
+                    const isCurrent = currentTimeSlot === workLog.timeSlot && isWorkHours;
                     
                     return (
                       <TimeSlotCard
-                        key={timeSlot}
-                        timeSlot={timeSlot}
+                        key={workLog.timeSlot}
+                        timeSlot={workLog.timeSlot}
                         workLog={workLog}
                         isCurrent={isCurrent}
                         isHoliday={isHoliday}
-                        onUpdate={(description) => updateWorkLog(dateString, timeSlot, description)}
+                        onUpdate={(description: string) => updateWorkLog(dateString, workLog.timeSlot, description)}
                       />
                     );
                   })}

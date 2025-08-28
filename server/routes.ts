@@ -8,7 +8,8 @@ import { isAuthenticated, requireGuest } from "./authMiddleware";
 import { 
   insertWorkLogSchema, 
   updateWorkLogSchema, 
-  TIME_SLOTS, 
+  generateTimeSlots,
+  workPreferencesSchema,
   signupSchema,
   loginSchema,
   forgotPasswordSchema,
@@ -178,6 +179,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Work preferences routes
+  app.get('/api/work-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user!.id;
+      let preferences = await storage.getUserWorkPreferences(userId);
+      
+      // Create default preferences if none exist
+      if (!preferences) {
+        preferences = await storage.createWorkPreferences({
+          userId,
+          startTime: '09:00',
+          endTime: '17:00',
+          slotDurationMinutes: '60',
+          timezone: 'Asia/Kolkata'
+        });
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error('Get work preferences error:', error);
+      res.status(500).json({ error: 'Failed to fetch work preferences' });
+    }
+  });
+
+  app.put('/api/work-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const validation = workPreferencesSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const userId = req.user!.id;
+      const updated = await storage.updateWorkPreferences(userId, validation.data);
+      
+      if (!updated) {
+        // Create if doesn't exist
+        const created = await storage.createWorkPreferences({
+          userId,
+          ...validation.data
+        });
+        return res.json(created);
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Update work preferences error:', error);
+      res.status(500).json({ error: 'Failed to update work preferences' });
+    }
+  });
+
+  app.get('/api/work-preferences/time-slots', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user!.id;
+      const preferences = await storage.getUserWorkPreferences(userId);
+      
+      if (!preferences) {
+        // Return default time slots
+        const defaultSlots = generateTimeSlots('09:00', '17:00', 60);
+        return res.json({ timeSlots: defaultSlots });
+      }
+      
+      const timeSlots = generateTimeSlots(
+        preferences.startTime, 
+        preferences.endTime, 
+        parseInt(preferences.slotDurationMinutes)
+      );
+      
+      res.json({ timeSlots });
+    } catch (error) {
+      console.error('Get time slots error:', error);
+      res.status(500).json({ error: 'Failed to generate time slots' });
+    }
+  });
+
   // Get work logs for a specific date
   app.get("/api/work-logs/:date", isAuthenticated, async (req: any, res) => {
     try {
@@ -199,7 +277,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.id;
       
       // Validate time slot
-      if (!TIME_SLOTS.includes(timeSlot as any)) {
+      // Get user's time slots to validate
+      const userPreferences = await storage.getUserWorkPreferences(userId);
+      const userTimeSlots = userPreferences 
+        ? generateTimeSlots(userPreferences.startTime, userPreferences.endTime, parseInt(userPreferences.slotDurationMinutes))
+        : generateTimeSlots('09:00', '17:00', 60); // Default slots
+        
+      if (!userTimeSlots.includes(timeSlot)) {
         return res.status(400).json({ error: "Invalid time slot" });
       }
 
@@ -243,8 +327,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { isHoliday } = req.body;
       const userId = req.user!.id;
       
+      // Get user's time slots for the day
+      const userPreferences = await storage.getUserWorkPreferences(userId);
+      const userTimeSlots = userPreferences 
+        ? generateTimeSlots(userPreferences.startTime, userPreferences.endTime, parseInt(userPreferences.slotDurationMinutes))
+        : generateTimeSlots('09:00', '17:00', 60); // Default slots
+        
       const results = await Promise.all(
-        TIME_SLOTS.map(async (timeSlot) => {
+        userTimeSlots.map(async (timeSlot: string) => {
           const existing = await storage.getWorkLog(userId, date, timeSlot);
           
           if (existing) {
@@ -349,6 +439,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const workLogs = await storage.getWorkLogsByDate(userId, date);
       
+      // Get user's time slots for calculations
+      const userPreferences = await storage.getUserWorkPreferences(userId);
+      const userTimeSlots = userPreferences 
+        ? generateTimeSlots(userPreferences.startTime, userPreferences.endTime, parseInt(userPreferences.slotDurationMinutes))
+        : generateTimeSlots('09:00', '17:00', 60); // Default slots
+      const slotDurationHours = userPreferences ? parseInt(userPreferences.slotDurationMinutes) / 60 : 1;
+      
       // Check if it's a holiday
       const isHoliday = workLogs.some(log => log.isHoliday);
       
@@ -357,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date,
           totalHours: 0,
           completedSlots: 0,
-          totalSlots: TIME_SLOTS.length,
+          totalSlots: userTimeSlots.length,
           completionPercentage: 0,
           workAreas: [],
           keyAccomplishments: ["Holiday"],
@@ -367,8 +464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calculate daily statistics
       const completedSlots = workLogs.filter(log => log.workDescription.trim() !== "").length;
-      const totalHours = completedSlots * 1 - (workLogs.filter(log => log.timeSlot === "11:30 PM" && log.workDescription.trim() !== "").length * 0.5);
-      const completionPercentage = Math.round((completedSlots / TIME_SLOTS.length) * 100);
+      const totalHours = completedSlots * slotDurationHours;
+      const completionPercentage = Math.round((completedSlots / userTimeSlots.length) * 100);
       
       // Analyze work areas
       const workAreaCount = new Map<string, number>();
@@ -414,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date,
         totalHours,
         completedSlots,
-        totalSlots: TIME_SLOTS.length,
+        totalSlots: userTimeSlots.length,
         completionPercentage,
         workAreas,
         keyAccomplishments: Array.from(accomplishments).slice(0, 5),
@@ -436,6 +533,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid year or month" });
       }
 
+      // Get user's time slots for calculations
+      const userPreferences = await storage.getUserWorkPreferences(userId);
+      const userTimeSlots = userPreferences 
+        ? generateTimeSlots(userPreferences.startTime, userPreferences.endTime, parseInt(userPreferences.slotDurationMinutes))
+        : generateTimeSlots('09:00', '17:00', 60); // Default slots
+      const slotDurationHours = userPreferences ? parseInt(userPreferences.slotDurationMinutes) / 60 : 1;
+
       const workLogs = await storage.getMonthlyWorkLogs(userId, year, month);
       
       // Group logs by date
@@ -451,12 +555,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dailySummaries = Array.from(logsByDate.entries()).map(([date, logs]) => {
         const isHoliday = logs.some(log => log.isHoliday);
         const completedSlots = logs.filter(log => !log.isHoliday && log.workDescription.trim() !== "").length;
-        const totalHours = isHoliday ? 0 : completedSlots * 1 - (logs.filter(log => log.timeSlot === "11:30 PM" && log.workDescription.trim() !== "").length * 0.5);
+        const totalHours = isHoliday ? 0 : completedSlots * slotDurationHours;
         
         return {
           date,
           hours: totalHours,
-          completionPercentage: isHoliday ? 0 : Math.round((completedSlots / TIME_SLOTS.length) * 100),
+          completionPercentage: isHoliday ? 0 : Math.round((completedSlots / userTimeSlots.length) * 100),
         };
       }).sort((a, b) => a.date.localeCompare(b.date));
       
@@ -467,12 +571,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const productiveHours = workLogs.filter(
         log => !log.isHoliday && log.workDescription.trim() !== ""
-      ).length * 1;
+      ).length * slotDurationHours;
       
-      const elevenThirtySlots = workLogs.filter(
-        log => !log.isHoliday && log.workDescription.trim() !== "" && log.timeSlot === "11:30 PM"
-      ).length;
-      const adjustedProductiveHours = productiveHours - (elevenThirtySlots * 0.5);
+      const adjustedProductiveHours = productiveHours;
       
       // Work area analysis
       const workAreas = new Map<string, number>();

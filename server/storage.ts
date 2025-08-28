@@ -3,6 +3,7 @@ import {
   workLogs,
   smsVerificationTokens,
   passwordResetTokens,
+  userWorkPreferences,
   type User,
   type UpsertUser,
   type WorkLog,
@@ -10,6 +11,8 @@ import {
   type UpdateWorkLog,
   type SMSVerificationToken,
   type PasswordResetToken,
+  type UserWorkPreferences,
+  type InsertWorkPreferences,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte } from "drizzle-orm";
@@ -32,6 +35,11 @@ export interface IStorage {
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenAsUsed(token: string): Promise<void>;
   deleteExpiredPasswordResetTokens(userId: string): Promise<void>;
+  
+  // Work preferences methods
+  getUserWorkPreferences(userId: string): Promise<UserWorkPreferences | undefined>;
+  createWorkPreferences(preferences: InsertWorkPreferences): Promise<UserWorkPreferences>;
+  updateWorkPreferences(userId: string, preferences: Partial<InsertWorkPreferences>): Promise<UserWorkPreferences | undefined>;
   
   // Work log methods
   getWorkLogsByDate(userId: string, date: string): Promise<WorkLog[]>;
@@ -104,6 +112,32 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(smsVerificationTokens)
       .where(eq(smsVerificationTokens.phoneNumber, phoneNumber));
+  }
+
+  // Work preferences methods
+  async getUserWorkPreferences(userId: string): Promise<UserWorkPreferences | undefined> {
+    const [preferences] = await db
+      .select()
+      .from(userWorkPreferences)
+      .where(eq(userWorkPreferences.userId, userId));
+    return preferences;
+  }
+
+  async createWorkPreferences(preferences: InsertWorkPreferences): Promise<UserWorkPreferences> {
+    const [created] = await db
+      .insert(userWorkPreferences)
+      .values(preferences)
+      .returning();
+    return created;
+  }
+
+  async updateWorkPreferences(userId: string, preferences: Partial<InsertWorkPreferences>): Promise<UserWorkPreferences | undefined> {
+    const [updated] = await db
+      .update(userWorkPreferences)
+      .set({ ...preferences, updatedAt: new Date() })
+      .where(eq(userWorkPreferences.userId, userId))
+      .returning();
+    return updated;
   }
 
   // Password reset tokens

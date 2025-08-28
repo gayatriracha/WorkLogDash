@@ -12,6 +12,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import VerifyEmail from "@/pages/verify-email";
 import VerifySMS from "@/pages/verify-sms";
+import WorkPreferences from "@/pages/work-preferences";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
         // Authenticated routes
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/preferences" component={WorkPreferences} />
           <Route component={NotFound} />
         </>
       ) : (

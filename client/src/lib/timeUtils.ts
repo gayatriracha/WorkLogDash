@@ -1,4 +1,4 @@
-import { TIME_SLOTS } from "@shared/schema";
+import { generateTimeSlots } from "@shared/schema";
 
 export function formatISTTime(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -13,67 +13,71 @@ export function getISTDate(date: Date = new Date()): Date {
   return new Date(date.toLocaleString("en-US", { timeZone: 'Asia/Kolkata' }));
 }
 
-export function getCurrentTimeSlot(): string | null {
+export function getCurrentTimeSlot(userTimeSlots?: string[]): string | null {
+  if (!userTimeSlots || userTimeSlots.length === 0) {
+    return null; // No time slots configured
+  }
+
   const istDate = getISTDate();
   const hours = istDate.getHours();
   const minutes = istDate.getMinutes();
+  const currentTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-  // Check if it's within work hours (2 PM to 11:30 PM IST)
-  if (hours < 14 || hours > 23 || (hours === 23 && minutes > 30)) {
+  // Find the current or next time slot
+  for (const slot of userTimeSlots) {
+    if (currentTime <= slot) {
+      return slot;
+    }
+  }
+
+  return null; // After all time slots
+}
+
+export function isWorkingHours(startTime: string = '09:00', endTime: string = '17:00'): boolean {
+  const istDate = getISTDate();
+  const hours = istDate.getHours();
+  const minutes = istDate.getMinutes();
+  const currentTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+  return currentTime >= startTime && currentTime <= endTime;
+}
+
+export function getNextTimeSlot(currentSlot?: string, userTimeSlots?: string[]): string | null {
+  if (!userTimeSlots || userTimeSlots.length === 0) {
     return null;
   }
 
-  // Handle special case for 11:30 PM
-  if (hours === 23 && minutes >= 30) {
-    return "11:30 PM";
-  }
-
-  // Handle regular hourly slots
-  if (hours >= 14 && hours <= 22) {
-    const hour12 = hours > 12 ? hours - 12 : hours;
-    const timeSlot = `${hour12}:00 PM`;
-    return TIME_SLOTS.includes(timeSlot as any) ? timeSlot : null;
-  }
-
-  return null;
-}
-
-export function isWorkingHours(): boolean {
-  const istDate = getISTDate();
-  const hours = istDate.getHours();
-  const minutes = istDate.getMinutes();
-
-  return (hours >= 14 && hours < 23) || (hours === 23 && minutes <= 30);
-}
-
-export function getNextTimeSlot(currentSlot?: string): string | null {
   if (!currentSlot) {
-    const current = getCurrentTimeSlot();
-    if (!current) return TIME_SLOTS[0];
+    const current = getCurrentTimeSlot(userTimeSlots);
+    if (!current) return userTimeSlots[0];
     currentSlot = current;
   }
 
-  const currentIndex = TIME_SLOTS.indexOf(currentSlot as any);
-  if (currentIndex === -1 || currentIndex === TIME_SLOTS.length - 1) {
+  const currentIndex = userTimeSlots.indexOf(currentSlot);
+  if (currentIndex === -1 || currentIndex === userTimeSlots.length - 1) {
     return null; // Invalid slot or last slot
   }
 
-  return TIME_SLOTS[currentIndex + 1];
+  return userTimeSlots[currentIndex + 1];
 }
 
-export function getPreviousTimeSlot(currentSlot?: string): string | null {
+export function getPreviousTimeSlot(currentSlot?: string, userTimeSlots?: string[]): string | null {
+  if (!userTimeSlots || userTimeSlots.length === 0) {
+    return null;
+  }
+
   if (!currentSlot) {
-    const current = getCurrentTimeSlot();
+    const current = getCurrentTimeSlot(userTimeSlots);
     if (!current) return null;
     currentSlot = current;
   }
 
-  const currentIndex = TIME_SLOTS.indexOf(currentSlot as any);
+  const currentIndex = userTimeSlots.indexOf(currentSlot);
   if (currentIndex <= 0) {
     return null; // Invalid slot or first slot
   }
 
-  return TIME_SLOTS[currentIndex - 1];
+  return userTimeSlots[currentIndex - 1];
 }
 
 export function formatDateForAPI(date: Date): string {
