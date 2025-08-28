@@ -13,7 +13,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  verifyEmailSchema
+  verifySMSSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -105,9 +105,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/verify-email', async (req, res) => {
+  app.post('/api/auth/verify-sms', async (req, res) => {
     try {
-      const validation = verifyEmailSchema.safeParse(req.body);
+      const validation = verifySMSSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 
           message: 'Invalid input', 
@@ -115,11 +115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const result = await authService.verifyEmail(validation.data);
+      const result = await authService.verifySMS(validation.data);
       res.json(result);
     } catch (error) {
-      console.error('Email verification error:', error);
-      const message = error instanceof Error ? error.message : 'Email verification failed';
+      console.error('SMS verification error:', error);
+      const message = error instanceof Error ? error.message : 'SMS verification failed';
       res.status(400).json({ message });
     }
   });
@@ -162,18 +162,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/resend-verification', async (req, res) => {
+  app.post('/api/auth/resend-sms', async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: 'Email is required' });
+      const { phoneNumber } = req.body;
+      if (!phoneNumber) {
+        return res.status(400).json({ message: 'Phone number is required' });
       }
 
-      const result = await authService.resendVerificationEmail(email);
+      const result = await authService.resendSMSVerification(phoneNumber);
       res.json(result);
     } catch (error) {
-      console.error('Resend verification error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to resend verification email';
+      console.error('Resend SMS verification error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to resend SMS verification';
       res.status(500).json({ message });
     }
   });

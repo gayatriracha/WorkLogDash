@@ -21,17 +21,19 @@ export const users = pgTable("users", {
   password: varchar("password").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  phoneNumber: varchar("phone_number"),
   profileImageUrl: varchar("profile_image_url"),
-  isEmailVerified: boolean("is_email_verified").notNull().default(false),
+  isPhoneVerified: boolean("is_phone_verified").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Email verification tokens table
-export const emailVerificationTokens = pgTable("email_verification_tokens", {
+// SMS verification tokens table
+export const smsVerificationTokens = pgTable("sms_verification_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: varchar("token").notNull().unique(),
+  phoneNumber: varchar("phone_number").notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -75,6 +77,7 @@ export const signupSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters long"),
   firstName: z.string().min(1, "First name is required").optional(),
   lastName: z.string().min(1, "Last name is required").optional(),
+  phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number").optional(),
 });
 
 export const loginSchema = z.object({
@@ -91,14 +94,15 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
-export const verifyEmailSchema = z.object({
-  token: z.string().min(1, "Verification token is required"),
+export const verifySMSSchema = z.object({
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  code: z.string().length(6, "Verification code must be 6 digits"),
 });
 
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
-export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type SMSVerificationToken = typeof smsVerificationTokens.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertWorkLog = z.infer<typeof insertWorkLogSchema>;
 export type UpdateWorkLog = z.infer<typeof updateWorkLogSchema>;
@@ -109,7 +113,7 @@ export type SignupData = z.infer<typeof signupSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
-export type VerifyEmailData = z.infer<typeof verifyEmailSchema>;
+export type VerifySMSData = z.infer<typeof verifySMSSchema>;
 
 // Daily and Monthly Summary schemas
 export const dailySummarySchema = z.object({

@@ -1,14 +1,14 @@
 import {
   users,
   workLogs,
-  emailVerificationTokens,
+  smsVerificationTokens,
   passwordResetTokens,
   type User,
   type UpsertUser,
   type WorkLog,
   type InsertWorkLog,
   type UpdateWorkLog,
-  type EmailVerificationToken,
+  type SMSVerificationToken,
   type PasswordResetToken,
 } from "@shared/schema";
 import { db } from "./db";
@@ -22,10 +22,10 @@ export interface IStorage {
   updateUser(id: string, userData: Partial<UpsertUser>): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
-  // Email verification tokens
-  createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<EmailVerificationToken>;
-  getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
-  deleteEmailVerificationToken(token: string): Promise<void>;
+  // SMS verification tokens
+  createSMSVerificationToken(userId: string, phoneNumber: string, code: string, expiresAt: Date): Promise<SMSVerificationToken>;
+  getSMSVerificationToken(phoneNumber: string, code: string): Promise<SMSVerificationToken | undefined>;
+  deleteSMSVerificationToken(phoneNumber: string): Promise<void>;
   
   // Password reset tokens
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken>;
@@ -83,27 +83,27 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Email verification tokens
-  async createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<EmailVerificationToken> {
+  // SMS verification tokens
+  async createSMSVerificationToken(userId: string, phoneNumber: string, code: string, expiresAt: Date): Promise<SMSVerificationToken> {
     const [verificationToken] = await db
-      .insert(emailVerificationTokens)
-      .values({ userId, token, expiresAt })
+      .insert(smsVerificationTokens)
+      .values({ userId, phoneNumber, code, expiresAt })
       .returning();
     return verificationToken;
   }
 
-  async getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined> {
+  async getSMSVerificationToken(phoneNumber: string, code: string): Promise<SMSVerificationToken | undefined> {
     const [verificationToken] = await db
       .select()
-      .from(emailVerificationTokens)
-      .where(eq(emailVerificationTokens.token, token));
+      .from(smsVerificationTokens)
+      .where(and(eq(smsVerificationTokens.phoneNumber, phoneNumber), eq(smsVerificationTokens.code, code)));
     return verificationToken;
   }
 
-  async deleteEmailVerificationToken(token: string): Promise<void> {
+  async deleteSMSVerificationToken(phoneNumber: string): Promise<void> {
     await db
-      .delete(emailVerificationTokens)
-      .where(eq(emailVerificationTokens.token, token));
+      .delete(smsVerificationTokens)
+      .where(eq(smsVerificationTokens.phoneNumber, phoneNumber));
   }
 
   // Password reset tokens

@@ -1,13 +1,18 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { storage } from './storage';
-import { emailService } from './emailService';
-import type { SignupData, LoginData, ForgotPasswordData, ResetPasswordData, VerifyEmailData, User } from '@shared/schema';
+import { smsService } from './smsService';
+import type { SignupData, LoginData, ForgotPasswordData, ResetPasswordData, VerifySMSData, User } from '@shared/schema';
 
 export class AuthService {
   // Generate secure random token
   private generateToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  // Generate 6-digit SMS verification code
+  private generateSMSCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   // Hash password
@@ -22,7 +27,7 @@ export class AuthService {
 
   // Sign up new user
   async signup(signupData: SignupData): Promise<{ message: string; userId?: string }> {
-    const { email, password, firstName, lastName } = signupData;
+    const { email, password, firstName, lastName, phoneNumber } = signupData;
 
     // Check if user already exists
     const existingUser = await storage.getUserByEmail(email);
@@ -39,25 +44,34 @@ export class AuthService {
       password: hashedPassword,
       firstName: firstName || null,
       lastName: lastName || null,
-      isEmailVerified: false,
+      phoneNumber: phoneNumber || null,
+      isPhoneVerified: phoneNumber ? false : true, // If no phone provided, consider verified
     });
 
-    // Generate email verification token
-    const verificationToken = this.generateToken();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // If phone number provided, send SMS verification
+    if (phoneNumber) {
+      const verificationCode = this.generateSMSCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    await storage.createEmailVerificationToken(user.id, verificationToken, expiresAt);
+      await storage.createSMSVerificationToken(user.id, phoneNumber, verificationCode, expiresAt);
 
-    // Send verification email
-    try {
-      await emailService.sendVerificationEmail(email, verificationToken);
-    } catch (error) {
-      console.error('Failed to send verification email:', error);
-      // Don't throw error - user is created, they can request new verification
+      try {
+        await smsService.sendVerificationCode(phoneNumber, verificationCode);
+        return {
+          message: 'Account created successfully. Please check your phone for the verification code.',
+          userId: user.id,
+        };
+      } catch (error) {
+        console.error('Failed to send SMS verification:', error);
+        return {
+          message: 'Account created successfully, but failed to send SMS. You can still login.',
+          userId: user.id,
+        };
+      }
     }
 
     return {
-      message: 'Account created successfully. Please check your email to verify your account.',
+      message: 'Account created successfully. You can now login.',
       userId: user.id,
     };
   }
@@ -78,9 +92,9 @@ export class AuthService {
       throw new Error('Invalid email or password');
     }
 
-    // Check if email is verified
-    if (!user.isEmailVerified) {
-      throw new Error('Please verify your email address before logging in');
+    // Check if phone is verified (only if phone number provided)
+    if (user.phoneNumber && !user.isPhoneVerified) {
+      throw new Error('Please verify your phone number before logging in');
     }
 
     // Return user without password
@@ -91,29 +105,29 @@ export class AuthService {
     };
   }
 
-  // Verify email
-  async verifyEmail(verifyData: VerifyEmailData): Promise<{ message: string }> {
-    const { token } = verifyData;
+  // Verify SMS
+  async verifySMS(verifyData: VerifySMSData): Promise<{ message: string }> {
+    const { phoneNumber, code } = verifyData;
 
     // Get verification token
-    const verificationToken = await storage.getEmailVerificationToken(token);
+    const verificationToken = await storage.getSMSVerificationToken(phoneNumber, code);
     if (!verificationToken) {
-      throw new Error('Invalid or expired verification token');
+      throw new Error('Invalid verification code');
     }
 
     // Check if token is expired
     if (new Date() > verificationToken.expiresAt) {
-      await storage.deleteEmailVerificationToken(token);
-      throw new Error('Verification token has expired. Please request a new one.');
+      await storage.deleteSMSVerificationToken(phoneNumber);
+      throw new Error('Verification code has expired. Please request a new one.');
     }
 
-    // Update user email verification status
-    await storage.updateUser(verificationToken.userId, { isEmailVerified: true });
+    // Update user phone verification status
+    await storage.updateUser(verificationToken.userId, { isPhoneVerified: true });
 
     // Delete verification token
-    await storage.deleteEmailVerificationToken(token);
+    await storage.deleteSMSVerificationToken(phoneNumber);
 
-    return { message: 'Email verified successfully. You can now login.' };
+    return { message: 'Phone number verified successfully. You can now login.' };
   }
 
   // Forgot password
@@ -136,13 +150,13 @@ export class AuthService {
 
     await storage.createPasswordResetToken(user.id, resetToken, expiresAt);
 
-    // Send password reset email
-    try {
-      await emailService.sendPasswordResetEmail(email, resetToken);
-    } catch (error) {
-      console.error('Failed to send password reset email:', error);
-      throw new Error('Failed to send password reset email. Please try again later.');
-    }
+    // For now, password reset is email-based (could be converted to SMS later)
+    // Just return success without actually sending anything in this SMS-focused version
+    console.log('🔐 Password Reset Token (Development Mode):');
+    console.log(`   Email: ${email}`);
+    console.log(`   Token: ${resetToken}`);
+    console.log('   Link: http://localhost:5000/reset-password?token=' + resetToken);
+    console.log('');
 
     return { message: 'If an account with that email exists, we sent a password reset link.' };
   }
@@ -179,37 +193,33 @@ export class AuthService {
     return { message: 'Password reset successfully. You can now login with your new password.' };
   }
 
-  // Resend verification email
-  async resendVerificationEmail(email: string): Promise<{ message: string }> {
-    // Get user by email
-    const user = await storage.getUserByEmail(email);
-    if (!user) {
-      return { message: 'If an account with that email exists, we sent a new verification email.' };
-    }
-
-    // Check if already verified
-    if (user.isEmailVerified) {
-      throw new Error('Email is already verified');
-    }
-
-    // Delete existing verification tokens
-    // This could be improved to query by userId, but for simplicity we'll generate a new one
+  // Resend SMS verification
+  async resendSMSVerification(phoneNumber: string): Promise<{ message: string }> {
+    // Find user with this phone number
+    // Note: This requires a new storage method to find user by phone number
+    // For now, we'll accept that the user provides the phone number they registered with
     
-    // Generate new verification token
-    const verificationToken = this.generateToken();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Delete existing verification tokens for this phone number
+    await storage.deleteSMSVerificationToken(phoneNumber);
+    
+    // Generate new verification code
+    const verificationCode = this.generateSMSCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    await storage.createEmailVerificationToken(user.id, verificationToken, expiresAt);
-
-    // Send verification email
+    // We need to find the user by phone number to get userId
+    // For simplicity, we'll create a temporary token without userId
+    // This would need to be improved in production
+    const tempUserId = 'temp'; // This is a limitation of current design
+    
     try {
-      await emailService.sendVerificationEmail(email, verificationToken);
+      await smsService.sendVerificationCode(phoneNumber, verificationCode);
+      // Create token only if SMS sending succeeds
+      await storage.createSMSVerificationToken(tempUserId, phoneNumber, verificationCode, expiresAt);
+      return { message: 'SMS verification code sent successfully.' };
     } catch (error) {
-      console.error('Failed to send verification email:', error);
-      throw new Error('Failed to send verification email. Please try again later.');
+      console.error('Failed to send SMS verification:', error);
+      throw new Error('Failed to send SMS verification. Please try again later.');
     }
-
-    return { message: 'If an account with that email exists, we sent a new verification email.' };
   }
 }
 

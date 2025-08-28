@@ -23,6 +23,7 @@ export default function Signup() {
       password: "",
       firstName: "",
       lastName: "",
+      phoneNumber: "",
     },
   });
 
@@ -64,7 +65,9 @@ export default function Signup() {
             
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Please check your email inbox and click the verification link to activate your account.
+                {successMessage.includes('phone') 
+                  ? 'Please check your phone for the verification code, then proceed to login.'
+                  : 'Your account has been created successfully. You can now login.'}
               </p>
               
               <Button 
@@ -149,6 +152,28 @@ export default function Signup() {
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="tel" 
+                        placeholder="+1234567890" 
+                        {...field} 
+                        data-testid="input-phoneNumber"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-muted-foreground">
+                      If provided, you'll receive SMS verification instead of email
+                    </p>
                   </FormItem>
                 )}
               />
