@@ -1,23 +1,180 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertWorkLogSchema, updateWorkLogSchema, TIME_SLOTS } from "@shared/schema";
+import { authService } from "./authService";
+import { isAuthenticated, requireGuest } from "./authMiddleware";
+import { 
+  insertWorkLogSchema, 
+  updateWorkLogSchema, 
+  TIME_SLOTS, 
+  signupSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  verifyEmailSchema
+} from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware - setupAuth now handles session middleware
-  await setupAuth(app);
+  // Session middleware setup
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+    ttl: sessionTtl / 1000, // convert to seconds
+    tableName: "sessions",
+  });
+  
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-here',
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: sessionTtl,
+    },
+  }));
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Authentication routes
+  app.post('/api/auth/signup', requireGuest, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const validation = signupSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const result = await authService.signup(validation.data);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Signup error:', error);
+      const message = error instanceof Error ? error.message : 'Signup failed';
+      res.status(400).json({ message });
+    }
+  });
+
+  app.post('/api/auth/login', requireGuest, async (req, res) => {
+    try {
+      const validation = loginSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const result = await authService.login(validation.data);
+      
+      // Store user in session
+      const session = req.session as any;
+      session.userId = result.user.id;
+      session.user = result.user;
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Login error:', error);
+      const message = error instanceof Error ? error.message : 'Login failed';
+      res.status(401).json({ message });
+    }
+  });
+
+  app.post('/api/auth/logout', async (req, res) => {
+    req.session?.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: 'Logout successful' });
+    });
+  });
+
+  app.get('/api/auth/user', isAuthenticated, async (req, res) => {
+    try {
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post('/api/auth/verify-email', async (req, res) => {
+    try {
+      const validation = verifyEmailSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const result = await authService.verifyEmail(validation.data);
+      res.json(result);
+    } catch (error) {
+      console.error('Email verification error:', error);
+      const message = error instanceof Error ? error.message : 'Email verification failed';
+      res.status(400).json({ message });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const validation = forgotPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const result = await authService.forgotPassword(validation.data);
+      res.json(result);
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to process forgot password request';
+      res.status(500).json({ message });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const validation = resetPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+
+      const result = await authService.resetPassword(validation.data);
+      res.json(result);
+    } catch (error) {
+      console.error('Reset password error:', error);
+      const message = error instanceof Error ? error.message : 'Password reset failed';
+      res.status(400).json({ message });
+    }
+  });
+
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const result = await authService.resendVerificationEmail(email);
+      res.json(result);
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to resend verification email';
+      res.status(500).json({ message });
     }
   });
 
@@ -25,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/work-logs/:date", isAuthenticated, async (req: any, res) => {
     try {
       const { date } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const workLogs = await storage.getWorkLogsByDate(userId, date);
       
       // Return only actual work logs that exist
@@ -39,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/work-logs/:date/:timeSlot", isAuthenticated, async (req: any, res) => {
     try {
       const { date, timeSlot } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       
       // Validate time slot
       if (!TIME_SLOTS.includes(timeSlot as any)) {
@@ -84,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.params;
       const { isHoliday } = req.body;
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       
       const results = await Promise.all(
         TIME_SLOTS.map(async (timeSlot) => {
@@ -115,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       
       if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
         return res.status(400).json({ error: "Invalid year or month" });

@@ -1,11 +1,8 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Landing() {
-  const handleLogin = () => {
-    window.location.href = "/api/login";
-  };
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <Card className="w-full max-w-md mx-4">
@@ -38,17 +35,31 @@ export default function Landing() {
             </div>
           </div>
           
-          <Button 
-            onClick={handleLogin} 
-            className="w-full" 
-            size="lg"
-            data-testid="login-button"
-          >
-            Sign In to Get Started
-          </Button>
+          <div className="flex gap-3">
+            <Link href="/login">
+              <Button 
+                className="flex-1" 
+                size="lg"
+                data-testid="button-login"
+              >
+                Sign In
+              </Button>
+            </Link>
+            
+            <Link href="/signup">
+              <Button 
+                variant="outline"
+                className="flex-1" 
+                size="lg"
+                data-testid="button-signup"
+              >
+                Sign Up
+              </Button>
+            </Link>
+          </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            Secure authentication powered by Replit
+            Secure authentication with email verification
           </p>
         </CardContent>
       </Card>

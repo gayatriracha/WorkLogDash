@@ -24,25 +24,20 @@ export default function Dashboard() {
   const { workLogs, updateWorkLog, setHolidayStatus, monthlySummary, isLoading } = useWorkLog(dateString);
   const { audioEnabled, toggleAudio, showNotification, closeNotification } = useAudioNotifications();
 
-  // Redirect to landing if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, authLoading]);
-
   const isHoliday = workLogs.some(log => log.isHoliday);
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { 
+        method: "POST",
+        credentials: "include" 
+      });
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Force reload anyway
+      window.location.href = "/";
+    }
   };
   
   // Calculate progress
