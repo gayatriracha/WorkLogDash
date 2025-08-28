@@ -12,21 +12,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.params;
       const workLogs = await storage.getWorkLogsByDate(date);
       
-      // Ensure all time slots are represented
-      const completeWorkLogs = TIME_SLOTS.map(timeSlot => {
-        const existing = workLogs.find(log => log.timeSlot === timeSlot);
-        return existing || {
-          id: `temp-${date}-${timeSlot}`,
-          date,
-          timeSlot,
-          workDescription: "",
-          isHoliday: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-      });
-
-      res.json(completeWorkLogs);
+      // Return only actual work logs that exist
+      res.json(workLogs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work logs" });
     }
@@ -54,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existing = await storage.getWorkLog(date, timeSlot);
       
-      if (existing && !existing.id.startsWith('temp-')) {
+      if (existing) {
         // Update existing
         const updated = await storage.updateWorkLog(date, timeSlot, validation.data);
         res.json(updated);
@@ -83,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         TIME_SLOTS.map(async (timeSlot) => {
           const existing = await storage.getWorkLog(date, timeSlot);
           
-          if (existing && !existing.id.startsWith('temp-')) {
+          if (existing) {
             return storage.updateWorkLog(date, timeSlot, { isHoliday });
           } else {
             return storage.createWorkLog({
