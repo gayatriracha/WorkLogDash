@@ -1,16 +1,32 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertWorkLogSchema, updateWorkLogSchema, TIME_SLOTS } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Get work logs for a specific date
-  app.get("/api/work-logs/:date", async (req, res) => {
+  app.get("/api/work-logs/:date", isAuthenticated, async (req: any, res) => {
     try {
       const { date } = req.params;
-      const workLogs = await storage.getWorkLogsByDate(date);
+      const userId = req.user.claims.sub;
+      const workLogs = await storage.getWorkLogsByDate(userId, date);
       
       // Return only actual work logs that exist
       res.json(workLogs);
@@ -20,9 +36,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create or update a work log entry
-  app.put("/api/work-logs/:date/:timeSlot", async (req, res) => {
+  app.put("/api/work-logs/:date/:timeSlot", isAuthenticated, async (req: any, res) => {
     try {
       const { date, timeSlot } = req.params;
+      const userId = req.user.claims.sub;
       
       // Validate time slot
       if (!TIME_SLOTS.includes(timeSlot as any)) {
@@ -31,6 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validation = updateWorkLogSchema.safeParse({
         ...req.body,
+        userId,
         date,
         timeSlot,
       });
@@ -39,15 +57,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: validation.error.issues });
       }
 
-      const existing = await storage.getWorkLog(date, timeSlot);
+      const existing = await storage.getWorkLog(userId, date, timeSlot);
       
       if (existing) {
         // Update existing
-        const updated = await storage.updateWorkLog(date, timeSlot, validation.data);
+        const updated = await storage.updateWorkLog(userId, date, timeSlot, validation.data);
         res.json(updated);
       } else {
         // Create new
         const created = await storage.createWorkLog({
+          userId,
           date,
           timeSlot,
           workDescription: validation.data.workDescription || "",
@@ -61,19 +80,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark entire day as holiday
-  app.put("/api/work-logs/:date/holiday", async (req, res) => {
+  app.put("/api/work-logs/:date/holiday", isAuthenticated, async (req: any, res) => {
     try {
       const { date } = req.params;
       const { isHoliday } = req.body;
+      const userId = req.user.claims.sub;
       
       const results = await Promise.all(
         TIME_SLOTS.map(async (timeSlot) => {
-          const existing = await storage.getWorkLog(date, timeSlot);
+          const existing = await storage.getWorkLog(userId, date, timeSlot);
           
           if (existing) {
-            return storage.updateWorkLog(date, timeSlot, { isHoliday });
+            return storage.updateWorkLog(userId, date, timeSlot, { isHoliday });
           } else {
             return storage.createWorkLog({
+              userId,
               date,
               timeSlot,
               workDescription: "",
@@ -90,16 +111,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get monthly summary
-  app.get("/api/work-logs/summary/:year/:month", async (req, res) => {
+  app.get("/api/work-logs/summary/:year/:month", isAuthenticated, async (req: any, res) => {
     try {
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
+      const userId = req.user.claims.sub;
       
       if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
         return res.status(400).json({ error: "Invalid year or month" });
       }
 
-      const workLogs = await storage.getMonthlyWorkLogs(year, month);
+      const workLogs = await storage.getMonthlyWorkLogs(userId, year, month);
       
       // Calculate statistics
       const totalDays = new Set(workLogs.map(log => log.date)).size;

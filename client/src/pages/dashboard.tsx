@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWorkLog } from "@/hooks/useWorkLog";
 import { useISTTime } from "@/hooks/useISTTime";
 import { useAudioNotifications } from "@/hooks/useAudioNotifications";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import ProgressRing from "@/components/ProgressRing";
 import AudioNotification from "@/components/AudioNotification";
@@ -11,16 +13,37 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { TIME_SLOTS } from "@shared/schema";
 import { formatISO } from "date-fns";
+import { LogOut, User } from "lucide-react";
 
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const dateString = formatISO(selectedDate, { representation: 'date' });
   
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentTime, currentTimeSlot, isWorkHours } = useISTTime();
   const { workLogs, updateWorkLog, setHolidayStatus, monthlySummary, isLoading } = useWorkLog(dateString);
   const { audioEnabled, toggleAudio, showNotification, closeNotification } = useAudioNotifications();
 
+  // Redirect to landing if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, authLoading]);
+
   const isHoliday = workLogs.some(log => log.isHoliday);
+
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
+  };
   
   // Calculate progress
   const completedSlots = workLogs.filter(log => !log.isHoliday && log.workDescription.trim() !== '').length;
@@ -37,7 +60,7 @@ export default function Dashboard() {
     setSelectedDate(newDate);
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -46,6 +69,10 @@ export default function Dashboard() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Will redirect via useEffect
   }
 
   return (
@@ -66,6 +93,22 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-sm">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">
+                  {(user as any)?.firstName || (user as any)?.email || 'User'}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center space-x-2"
+                data-testid="logout-button"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </Button>
               <Button
                 variant={audioEnabled ? "default" : "secondary"}
                 size="sm"

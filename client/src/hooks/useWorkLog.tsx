@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
 import type { WorkLog, UpdateWorkLog } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,6 +53,18 @@ export function useWorkLog(date: string) {
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs/summary'] });
     },
     onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
       toast({
         title: "Error",
         description: "Failed to update work log",
@@ -79,7 +92,19 @@ export function useWorkLog(date: string) {
           : "This day is now marked as a working day",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
       toast({
         title: "Error",
         description: "Failed to update holiday status",

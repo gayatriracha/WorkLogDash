@@ -1,104 +1,117 @@
-import { type WorkLog, type InsertWorkLog, type UpdateWorkLog } from "@shared/schema";
-import { randomUUID } from "crypto";
+import {
+  users,
+  workLogs,
+  type User,
+  type UpsertUser,
+  type WorkLog,
+  type InsertWorkLog,
+  type UpdateWorkLog,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<any | undefined>;
-  getUserByUsername(username: string): Promise<any | undefined>;
-  createUser(user: any): Promise<any>;
+  // User operations (mandatory for Replit Auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
   
   // Work log methods
-  getWorkLogsByDate(date: string): Promise<WorkLog[]>;
-  getWorkLog(date: string, timeSlot: string): Promise<WorkLog | undefined>;
+  getWorkLogsByDate(userId: string, date: string): Promise<WorkLog[]>;
+  getWorkLog(userId: string, date: string, timeSlot: string): Promise<WorkLog | undefined>;
   createWorkLog(workLog: InsertWorkLog): Promise<WorkLog>;
-  updateWorkLog(date: string, timeSlot: string, updates: UpdateWorkLog): Promise<WorkLog | undefined>;
-  getWorkLogsByDateRange(startDate: string, endDate: string): Promise<WorkLog[]>;
-  getMonthlyWorkLogs(year: number, month: number): Promise<WorkLog[]>;
+  updateWorkLog(userId: string, date: string, timeSlot: string, updates: UpdateWorkLog): Promise<WorkLog | undefined>;
+  getWorkLogsByDateRange(userId: string, startDate: string, endDate: string): Promise<WorkLog[]>;
+  getMonthlyWorkLogs(userId: string, year: number, month: number): Promise<WorkLog[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, any>;
-  private workLogs: Map<string, WorkLog>; // key: `${date}-${timeSlot}`
-
-  constructor() {
-    this.users = new Map();
-    this.workLogs = new Map();
-  }
-
-  async getUser(id: string): Promise<any | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<any | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: any): Promise<any> {
-    const id = randomUUID();
-    const user: any = { ...insertUser, id };
-    this.users.set(id, user);
+export class DatabaseStorage implements IStorage {
+  // User operations (mandatory for Replit Auth)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
-  private getWorkLogKey(date: string, timeSlot: string): string {
-    return `${date}-${timeSlot}`;
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
   }
 
-  async getWorkLogsByDate(date: string): Promise<WorkLog[]> {
-    return Array.from(this.workLogs.values()).filter(log => log.date === date);
+  // Work log methods
+  async getWorkLogsByDate(userId: string, date: string): Promise<WorkLog[]> {
+    return await db
+      .select()
+      .from(workLogs)
+      .where(and(eq(workLogs.userId, userId), eq(workLogs.date, date)));
   }
 
-  async getWorkLog(date: string, timeSlot: string): Promise<WorkLog | undefined> {
-    return this.workLogs.get(this.getWorkLogKey(date, timeSlot));
-  }
-
-  async createWorkLog(insertWorkLog: InsertWorkLog): Promise<WorkLog> {
-    const id = randomUUID();
-    const now = new Date();
-    const workLog: WorkLog = {
-      id,
-      date: insertWorkLog.date,
-      timeSlot: insertWorkLog.timeSlot,
-      workDescription: insertWorkLog.workDescription || "",
-      isHoliday: insertWorkLog.isHoliday || false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    
-    this.workLogs.set(this.getWorkLogKey(workLog.date, workLog.timeSlot), workLog);
+  async getWorkLog(userId: string, date: string, timeSlot: string): Promise<WorkLog | undefined> {
+    const [workLog] = await db
+      .select()
+      .from(workLogs)
+      .where(
+        and(
+          eq(workLogs.userId, userId),
+          eq(workLogs.date, date),
+          eq(workLogs.timeSlot, timeSlot)
+        )
+      );
     return workLog;
   }
 
-  async updateWorkLog(date: string, timeSlot: string, updates: UpdateWorkLog): Promise<WorkLog | undefined> {
-    const key = this.getWorkLogKey(date, timeSlot);
-    const existing = this.workLogs.get(key);
-    
-    if (!existing) {
-      return undefined;
-    }
+  async createWorkLog(insertWorkLog: InsertWorkLog): Promise<WorkLog> {
+    const [workLog] = await db
+      .insert(workLogs)
+      .values(insertWorkLog)
+      .returning();
+    return workLog;
+  }
 
-    const updated: WorkLog = {
-      ...existing,
-      ...updates,
-      updatedAt: new Date(),
-    };
-
-    this.workLogs.set(key, updated);
+  async updateWorkLog(userId: string, date: string, timeSlot: string, updates: UpdateWorkLog): Promise<WorkLog | undefined> {
+    const [updated] = await db
+      .update(workLogs)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(workLogs.userId, userId),
+          eq(workLogs.date, date),
+          eq(workLogs.timeSlot, timeSlot)
+        )
+      )
+      .returning();
     return updated;
   }
 
-  async getWorkLogsByDateRange(startDate: string, endDate: string): Promise<WorkLog[]> {
-    return Array.from(this.workLogs.values()).filter(log => 
-      log.date >= startDate && log.date <= endDate
-    );
+  async getWorkLogsByDateRange(userId: string, startDate: string, endDate: string): Promise<WorkLog[]> {
+    return await db
+      .select()
+      .from(workLogs)
+      .where(
+        and(
+          eq(workLogs.userId, userId),
+          gte(workLogs.date, startDate),
+          lte(workLogs.date, endDate)
+        )
+      );
   }
 
-  async getMonthlyWorkLogs(year: number, month: number): Promise<WorkLog[]> {
+  async getMonthlyWorkLogs(userId: string, year: number, month: number): Promise<WorkLog[]> {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
     const endDate = `${year}-${month.toString().padStart(2, '0')}-31`;
-    return this.getWorkLogsByDateRange(startDate, endDate);
+    return this.getWorkLogsByDateRange(userId, startDate, endDate);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
