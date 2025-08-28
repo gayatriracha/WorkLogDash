@@ -10,7 +10,6 @@ class NodemailerEmailService implements EmailService {
 
   constructor() {
     // Configure with environment variables for production
-    // For development, we'll use a mock transporter that logs to console
     if (process.env.NODE_ENV === 'production' && process.env.SMTP_HOST) {
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -22,15 +21,11 @@ class NodemailerEmailService implements EmailService {
         },
       });
     } else {
-      // Development mode - create test account
+      // Development mode - use a test transporter that doesn't actually send emails
       this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: 'ethereal.test@ethereal.email',
-          pass: 'ethereal.test',
-        },
+        streamTransport: true,
+        newline: 'unix',
+        buffer: true
       });
     }
   }
