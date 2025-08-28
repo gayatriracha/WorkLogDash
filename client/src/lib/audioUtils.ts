@@ -73,7 +73,6 @@ export function showDesktopNotification(title: string, body: string, icon?: stri
       body,
       icon: icon || '/favicon.ico',
       badge: '/favicon.ico',
-      timestamp: Date.now(),
       requireInteraction: false,
       silent: false,
     });

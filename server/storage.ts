@@ -57,8 +57,11 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const now = new Date();
     const workLog: WorkLog = {
-      ...insertWorkLog,
       id,
+      date: insertWorkLog.date,
+      timeSlot: insertWorkLog.timeSlot,
+      workDescription: insertWorkLog.workDescription || "",
+      isHoliday: insertWorkLog.isHoliday || false,
       createdAt: now,
       updatedAt: now,
     };
