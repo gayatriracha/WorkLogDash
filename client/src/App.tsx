@@ -10,7 +10,6 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
-import VerifyEmail from "@/pages/verify-email";
 import VerifySMS from "@/pages/verify-sms";
 import WorkPreferences from "@/pages/work-preferences";
 import NotFound from "@/pages/not-found";
@@ -35,7 +34,6 @@ function Router() {
           <Route path="/signup" component={Signup} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
-          <Route path="/verify-email" component={VerifyEmail} />
           <Route path="/verify-sms" component={VerifySMS} />
           <Route component={NotFound} />
         </>
