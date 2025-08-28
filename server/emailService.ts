@@ -44,7 +44,7 @@ class NodemailerEmailService implements EmailService {
         subject: subject
       }],
       from: { 
-        email: process.env.FROM_EMAIL || 'noreply@worklog.app',
+        email: process.env.FROM_EMAIL || 'sublimetechie@gmail.com',
         name: 'Work Log Dashboard'
       },
       content: [{
@@ -102,7 +102,7 @@ class NodemailerEmailService implements EmailService {
         await this.sendEmailWithSendGrid(email, subject, html);
       } else if (this.transporter) {
         const mailOptions = {
-          from: process.env.FROM_EMAIL || 'noreply@worklog.app',
+          from: process.env.FROM_EMAIL || 'sublimetechie@gmail.com',
           to: email,
           subject: subject,
           html: html,
@@ -152,7 +152,7 @@ class NodemailerEmailService implements EmailService {
         await this.sendEmailWithSendGrid(email, subject, html);
       } else if (this.transporter) {
         const mailOptions = {
-          from: process.env.FROM_EMAIL || 'noreply@worklog.app',
+          from: process.env.FROM_EMAIL || 'sublimetechie@gmail.com',
           to: email,
           subject: subject,
           html: html,
