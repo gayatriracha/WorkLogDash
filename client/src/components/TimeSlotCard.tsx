@@ -109,7 +109,7 @@ export default function TimeSlotCard({
             <div>
               <h3 className="font-semibold text-foreground">{timeSlot}</h3>
               <p className="text-xs text-muted-foreground">
-                {get24HourFormat(timeSlot)} IST
+                {get24HourFormat(timeSlot)}
                 {isCurrent && <span className="ml-2 text-accent">• Current Hour</span>}
               </p>
             </div>

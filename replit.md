@@ -31,10 +31,10 @@ Preferred communication style: Simple, everyday language.
 - **Migration Strategy**: Database schema versioning through Drizzle Kit
 
 ## Time Management System
-- **Time Zone**: India Standard Time (IST) as the primary timezone
+- **Time Zone**: User-configurable timezone support with UTC as default
 - **Work Hours**: Customizable schedule with user-defined start/end times and slot durations
 - **Audio Notifications**: Web Audio API implementation with browser permission handling
-- **Real-time Updates**: Client-side time tracking with IST conversion utilities
+- **Real-time Updates**: Client-side time tracking with timezone-aware conversion utilities
 
 ## Development Workflow
 - **Build System**: Vite for frontend bundling with esbuild for server-side compilation

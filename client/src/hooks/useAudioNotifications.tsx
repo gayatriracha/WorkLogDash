@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useISTTime } from "./useISTTime";
+import { useUserTime } from "./useISTTime";
 import { playNotificationSound } from "@/lib/audioUtils";
 
 export function useAudioNotifications() {
@@ -10,7 +10,7 @@ export function useAudioNotifications() {
   const [showNotification, setShowNotification] = useState(false);
   const [lastNotificationTime, setLastNotificationTime] = useState<string | null>(null);
 
-  const { currentTime, isWorkHours } = useISTTime();
+  const { currentTime, isWorkHours, workPreferences } = useUserTime();
 
   const toggleAudio = useCallback(() => {
     const newState = !audioEnabled;
@@ -26,14 +26,15 @@ export function useAudioNotifications() {
     if (!audioEnabled || !isWorkHours) return;
 
     const now = new Date();
-    const istTime = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Kolkata',
+    const userTimezone = workPreferences?.timezone || 'UTC';
+    const timezoneTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTimezone,
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     }).format(now);
 
-    const [hours, minutes] = istTime.split(':').map(Number);
+    const [hours, minutes] = timezoneTime.split(':').map(Number);
     const currentTimeKey = `${hours}:${minutes}`;
 
     // Audio notifications will be based on user's work preferences

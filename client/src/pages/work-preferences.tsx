@@ -23,7 +23,7 @@ export default function WorkPreferences() {
     startTime: '09:00',
     endTime: '17:00',
     slotDurationMinutes: '60',
-    timezone: 'Asia/Kolkata'
+    timezone: 'UTC'
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -222,11 +222,18 @@ export default function WorkPreferences() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="UTC">Coordinated Universal Time (UTC)</SelectItem>
                     <SelectItem value="Asia/Kolkata">India Standard Time (IST)</SelectItem>
-                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                    <SelectItem value="America/New_York">Eastern Time (EST/EDT)</SelectItem>
+                    <SelectItem value="America/Chicago">Central Time (CST/CDT)</SelectItem>
+                    <SelectItem value="America/Denver">Mountain Time (MST/MDT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific Time (PST/PDT)</SelectItem>
                     <SelectItem value="Europe/London">Greenwich Mean Time (GMT)</SelectItem>
+                    <SelectItem value="Europe/Paris">Central European Time (CET)</SelectItem>
+                    <SelectItem value="Europe/Berlin">Central European Time (CET)</SelectItem>
                     <SelectItem value="Asia/Tokyo">Japan Standard Time (JST)</SelectItem>
+                    <SelectItem value="Asia/Shanghai">China Standard Time (CST)</SelectItem>
+                    <SelectItem value="Australia/Sydney">Australian Eastern Time (AET)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

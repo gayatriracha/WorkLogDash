@@ -192,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           startTime: '09:00',
           endTime: '17:00',
           slotDurationMinutes: '60',
-          timezone: 'Asia/Kolkata'
+          timezone: 'UTC'
         });
       }
       

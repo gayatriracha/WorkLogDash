@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useWorkLog } from "@/hooks/useWorkLog";
-import { useISTTime } from "@/hooks/useISTTime";
+import { useUserTime } from "@/hooks/useISTTime";
 import { useAudioNotifications } from "@/hooks/useAudioNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -24,7 +24,7 @@ export default function Dashboard() {
   const dateString = formatISO(selectedDate, { representation: 'date' });
   
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { currentTime, currentTimeSlot, isWorkHours } = useISTTime();
+  const { currentTime, currentTimeSlot, isWorkHours, workPreferences, userTimeSlots } = useUserTime();
   const { workLogs, updateWorkLog, setHolidayStatus, monthlySummary, dailySummary, enhancedMonthlySummary, isLoading } = useWorkLog(dateString);
   const { audioEnabled, toggleAudio, showNotification, closeNotification } = useAudioNotifications();
   const { showEndOfDayModal, closeModal } = useEndOfDayNotification(dailySummary, dateString);
@@ -140,7 +140,7 @@ export default function Dashboard() {
                   })}
                 </div>
                 <div className="text-xs text-muted-foreground" data-testid="current-time">
-                  {currentTime} IST
+                  {currentTime}
                 </div>
               </div>
             </div>
@@ -237,7 +237,7 @@ export default function Dashboard() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Current Time</span>
                     <span className="font-medium text-foreground" data-testid="sidebar-current-time">
-                      {currentTime} IST
+                      {currentTime}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">

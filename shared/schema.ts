@@ -163,7 +163,7 @@ export const userWorkPreferences = pgTable("user_work_preferences", {
   startTime: varchar("start_time").notNull().default("09:00"), // 24-hour format
   endTime: varchar("end_time").notNull().default("17:00"), // 24-hour format
   slotDurationMinutes: varchar("slot_duration_minutes").notNull().default("60"), // Duration of each time slot
-  timezone: varchar("timezone").notNull().default("Asia/Kolkata"), // User's timezone
+  timezone: varchar("timezone").notNull().default("UTC"), // User's timezone
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

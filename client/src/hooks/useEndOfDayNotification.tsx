@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useISTTime } from "./useISTTime";
+import { useUserTime } from "./useISTTime";
 import type { DailySummary } from "@shared/schema";
 
 export function useEndOfDayNotification(dailySummary: DailySummary | undefined, date: string) {
   const [showEndOfDayModal, setShowEndOfDayModal] = useState(false);
   const [hasShownToday, setHasShownToday] = useState<string | null>(null);
-  const { currentTime } = useISTTime();
+  const { currentTime } = useUserTime();
 
   useEffect(() => {
     // Reset when date changes

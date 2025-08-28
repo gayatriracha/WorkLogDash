@@ -25,7 +25,7 @@ export default function AudioNotification({
             Time to Log Your Work!
           </h3>
           <p className="text-muted-foreground mb-6">
-            It's <span className="font-medium">{currentTime}</span> IST. Please update your work log.
+            It's <span className="font-medium">{currentTime}</span>. Please update your work log.
           </p>
           <div className="flex space-x-3">
             <Button

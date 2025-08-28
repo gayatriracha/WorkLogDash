@@ -1,26 +1,26 @@
 import { generateTimeSlots } from "@shared/schema";
 
-export function formatISTTime(date: Date): string {
+export function formatTimeInTimezone(date: Date, timezone: string = 'UTC'): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Kolkata',
+    timeZone: timezone,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
   }).format(date);
 }
 
-export function getISTDate(date: Date = new Date()): Date {
-  return new Date(date.toLocaleString("en-US", { timeZone: 'Asia/Kolkata' }));
+export function getDateInTimezone(date: Date = new Date(), timezone: string = 'UTC'): Date {
+  return new Date(date.toLocaleString("en-US", { timeZone: timezone }));
 }
 
-export function getCurrentTimeSlot(userTimeSlots?: string[]): string | null {
+export function getCurrentTimeSlot(userTimeSlots?: string[], timezone: string = 'UTC'): string | null {
   if (!userTimeSlots || userTimeSlots.length === 0) {
     return null; // No time slots configured
   }
 
-  const istDate = getISTDate();
-  const hours = istDate.getHours();
-  const minutes = istDate.getMinutes();
+  const timezoneDate = getDateInTimezone(new Date(), timezone);
+  const hours = timezoneDate.getHours();
+  const minutes = timezoneDate.getMinutes();
   const currentTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
   // Find the current or next time slot
@@ -33,10 +33,10 @@ export function getCurrentTimeSlot(userTimeSlots?: string[]): string | null {
   return null; // After all time slots
 }
 
-export function isWorkingHours(startTime: string = '09:00', endTime: string = '17:00'): boolean {
-  const istDate = getISTDate();
-  const hours = istDate.getHours();
-  const minutes = istDate.getMinutes();
+export function isWorkingHours(startTime: string = '09:00', endTime: string = '17:00', timezone: string = 'UTC'): boolean {
+  const timezoneDate = getDateInTimezone(new Date(), timezone);
+  const hours = timezoneDate.getHours();
+  const minutes = timezoneDate.getMinutes();
   const currentTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
   return currentTime >= startTime && currentTime <= endTime;

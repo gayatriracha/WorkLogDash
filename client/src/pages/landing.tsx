@@ -23,7 +23,7 @@ export default function Landing() {
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-primary rounded-full"></div>
-              <span className="text-sm">Real-time IST clock</span>
+              <span className="text-sm">Real-time clock</span>
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-primary rounded-full"></div>
