@@ -341,6 +341,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get daily summary for a specific date
+  app.get("/api/work-logs/daily-summary/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const { date } = req.params;
+      const userId = req.user!.id;
+      
+      const workLogs = await storage.getWorkLogsByDate(userId, date);
+      
+      // Check if it's a holiday
+      const isHoliday = workLogs.some(log => log.isHoliday);
+      
+      if (isHoliday) {
+        return res.json({
+          date,
+          totalHours: 0,
+          completedSlots: 0,
+          totalSlots: TIME_SLOTS.length,
+          completionPercentage: 0,
+          workAreas: [],
+          keyAccomplishments: ["Holiday"],
+          isHoliday: true,
+        });
+      }
+      
+      // Calculate daily statistics
+      const completedSlots = workLogs.filter(log => log.workDescription.trim() !== "").length;
+      const totalHours = completedSlots * 1 - (workLogs.filter(log => log.timeSlot === "11:30 PM" && log.workDescription.trim() !== "").length * 0.5);
+      const completionPercentage = Math.round((completedSlots / TIME_SLOTS.length) * 100);
+      
+      // Analyze work areas
+      const workAreaCount = new Map<string, number>();
+      const accomplishments = new Set<string>();
+      
+      workLogs.forEach(log => {
+        if (log.workDescription.trim() !== "") {
+          const description = log.workDescription.toLowerCase();
+          
+          // Categorize work areas
+          if (description.includes('frontend') || description.includes('react') || description.includes('ui')) {
+            workAreaCount.set('Frontend Development', (workAreaCount.get('Frontend Development') || 0) + 1);
+          } else if (description.includes('backend') || description.includes('api') || description.includes('server')) {
+            workAreaCount.set('Backend Development', (workAreaCount.get('Backend Development') || 0) + 1);
+          } else if (description.includes('review') || description.includes('code review')) {
+            workAreaCount.set('Code Review', (workAreaCount.get('Code Review') || 0) + 1);
+          } else if (description.includes('meeting') || description.includes('standup')) {
+            workAreaCount.set('Meetings', (workAreaCount.get('Meetings') || 0) + 1);
+          } else if (description.includes('documentation') || description.includes('docs')) {
+            workAreaCount.set('Documentation', (workAreaCount.get('Documentation') || 0) + 1);
+          } else if (description.includes('testing') || description.includes('test')) {
+            workAreaCount.set('Testing', (workAreaCount.get('Testing') || 0) + 1);
+          } else if (description.includes('deployment') || description.includes('deploy')) {
+            workAreaCount.set('Deployment', (workAreaCount.get('Deployment') || 0) + 1);
+          } else {
+            workAreaCount.set('Other', (workAreaCount.get('Other') || 0) + 1);
+          }
+          
+          // Extract key accomplishments (non-empty descriptions)
+          if (log.workDescription.length > 10) { // More substantial descriptions
+            accomplishments.add(log.workDescription);
+          }
+        }
+      });
+      
+      const workAreas = Array.from(workAreaCount.entries()).map(([area, hours]) => ({
+        area,
+        hours,
+        percentage: Math.round((hours / completedSlots) * 100),
+      })).sort((a, b) => b.hours - a.hours);
+      
+      res.json({
+        date,
+        totalHours,
+        completedSlots,
+        totalSlots: TIME_SLOTS.length,
+        completionPercentage,
+        workAreas,
+        keyAccomplishments: Array.from(accomplishments).slice(0, 5),
+        isHoliday: false,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate daily summary" });
+    }
+  });
+
+  // Get enhanced monthly summary with daily breakdowns
+  app.get("/api/work-logs/enhanced-summary/:year/:month", isAuthenticated, async (req: any, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const userId = req.user!.id;
+      
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ error: "Invalid year or month" });
+      }
+
+      const workLogs = await storage.getMonthlyWorkLogs(userId, year, month);
+      
+      // Group logs by date
+      const logsByDate = new Map<string, typeof workLogs>();
+      workLogs.forEach(log => {
+        if (!logsByDate.has(log.date)) {
+          logsByDate.set(log.date, []);
+        }
+        logsByDate.get(log.date)!.push(log);
+      });
+      
+      // Calculate daily summaries
+      const dailySummaries = Array.from(logsByDate.entries()).map(([date, logs]) => {
+        const isHoliday = logs.some(log => log.isHoliday);
+        const completedSlots = logs.filter(log => !log.isHoliday && log.workDescription.trim() !== "").length;
+        const totalHours = isHoliday ? 0 : completedSlots * 1 - (logs.filter(log => log.timeSlot === "11:30 PM" && log.workDescription.trim() !== "").length * 0.5);
+        
+        return {
+          date,
+          hours: totalHours,
+          completionPercentage: isHoliday ? 0 : Math.round((completedSlots / TIME_SLOTS.length) * 100),
+        };
+      }).sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Calculate monthly statistics
+      const totalDays = logsByDate.size;
+      const holidayDays = Array.from(logsByDate.values()).filter(logs => logs.some(log => log.isHoliday)).length;
+      const workingDays = totalDays - holidayDays;
+      
+      const productiveHours = workLogs.filter(
+        log => !log.isHoliday && log.workDescription.trim() !== ""
+      ).length * 1;
+      
+      const elevenThirtySlots = workLogs.filter(
+        log => !log.isHoliday && log.workDescription.trim() !== "" && log.timeSlot === "11:30 PM"
+      ).length;
+      const adjustedProductiveHours = productiveHours - (elevenThirtySlots * 0.5);
+      
+      // Work area analysis
+      const workAreas = new Map<string, number>();
+      const allAccomplishments = new Set<string>();
+      
+      workLogs.forEach(log => {
+        if (!log.isHoliday && log.workDescription.trim() !== "") {
+          const description = log.workDescription.toLowerCase();
+          
+          // Categorize work areas
+          if (description.includes('frontend') || description.includes('react') || description.includes('ui')) {
+            workAreas.set('Frontend Development', (workAreas.get('Frontend Development') || 0) + 1);
+          } else if (description.includes('backend') || description.includes('api') || description.includes('server')) {
+            workAreas.set('Backend Development', (workAreas.get('Backend Development') || 0) + 1);
+          } else if (description.includes('review') || description.includes('code review')) {
+            workAreas.set('Code Review', (workAreas.get('Code Review') || 0) + 1);
+          } else if (description.includes('meeting') || description.includes('standup')) {
+            workAreas.set('Meetings', (workAreas.get('Meetings') || 0) + 1);
+          } else if (description.includes('documentation') || description.includes('docs')) {
+            workAreas.set('Documentation', (workAreas.get('Documentation') || 0) + 1);
+          } else if (description.includes('testing') || description.includes('test')) {
+            workAreas.set('Testing', (workAreas.get('Testing') || 0) + 1);
+          } else if (description.includes('deployment') || description.includes('deploy')) {
+            workAreas.set('Deployment', (workAreas.get('Deployment') || 0) + 1);
+          } else {
+            workAreas.set('Other', (workAreas.get('Other') || 0) + 1);
+          }
+          
+          // Collect key accomplishments
+          if (log.workDescription.length > 15) {
+            allAccomplishments.add(log.workDescription);
+          }
+        }
+      });
+      
+      const topWorkAreas = Array.from(workAreas.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([area, hours]) => ({
+          area,
+          hours,
+          percentage: Math.round((hours / (adjustedProductiveHours || 1)) * 100)
+        }));
+      
+      // Find most productive days
+      const mostProductiveDays = dailySummaries
+        .filter(day => !day.date.endsWith('holiday'))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5)
+        .map(day => ({
+          date: day.date,
+          hours: day.hours,
+          completionPercentage: day.completionPercentage,
+        }));
+      
+      res.json({
+        year,
+        month,
+        totalDays,
+        workingDays,
+        holidayDays,
+        totalProductiveHours: adjustedProductiveHours,
+        averageHoursPerDay: workingDays > 0 ? Math.round((adjustedProductiveHours / workingDays) * 10) / 10 : 0,
+        topWorkAreas,
+        dailySummaries: dailySummaries.map(day => ({
+          date: day.date,
+          totalHours: day.hours,
+          completedSlots: Math.ceil(day.hours),
+          totalSlots: TIME_SLOTS.length,
+          completionPercentage: day.completionPercentage,
+          workAreas: [], // Could be populated per day if needed
+          keyAccomplishments: [],
+          isHoliday: day.completionPercentage === 0 && day.hours === 0,
+        })),
+        keyAccomplishments: Array.from(allAccomplishments).slice(0, 10),
+        mostProductiveDays,
+      });
+    } catch (error) {
+      console.error("Enhanced monthly summary error:", error);
+      res.status(500).json({ error: "Failed to generate enhanced monthly summary" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -111,6 +111,47 @@ export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
 export type VerifyEmailData = z.infer<typeof verifyEmailSchema>;
 
+// Daily and Monthly Summary schemas
+export const dailySummarySchema = z.object({
+  date: z.string(),
+  totalHours: z.number(),
+  completedSlots: z.number(),
+  totalSlots: z.number(),
+  completionPercentage: z.number(),
+  workAreas: z.array(z.object({
+    area: z.string(),
+    hours: z.number(),
+    percentage: z.number(),
+  })),
+  keyAccomplishments: z.array(z.string()),
+  isHoliday: z.boolean(),
+});
+
+export const monthlySummaryEnhancedSchema = z.object({
+  year: z.number(),
+  month: z.number(),
+  totalDays: z.number(),
+  workingDays: z.number(),
+  holidayDays: z.number(),
+  totalProductiveHours: z.number(),
+  averageHoursPerDay: z.number(),
+  topWorkAreas: z.array(z.object({
+    area: z.string(),
+    hours: z.number(),
+    percentage: z.number(),
+  })),
+  dailySummaries: z.array(dailySummarySchema),
+  keyAccomplishments: z.array(z.string()),
+  mostProductiveDays: z.array(z.object({
+    date: z.string(),
+    hours: z.number(),
+    completionPercentage: z.number(),
+  })),
+});
+
+export type DailySummary = z.infer<typeof dailySummarySchema>;
+export type MonthlySummaryEnhanced = z.infer<typeof monthlySummaryEnhancedSchema>;
+
 // Time slots from 2 PM to 11:30 PM IST
 export const TIME_SLOTS = [
   "2:00 PM",

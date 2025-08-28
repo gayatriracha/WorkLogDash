@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { WorkLog, UpdateWorkLog } from "@shared/schema";
+import type { WorkLog, UpdateWorkLog, DailySummary, MonthlySummaryEnhanced } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 interface MonthlySummary {
@@ -36,6 +36,18 @@ export function useWorkLog(date: string) {
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
+  // Get daily summary for the selected date
+  const { data: dailySummary } = useQuery<DailySummary>({
+    queryKey: ['/api/work-logs/daily-summary', date],
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  // Get enhanced monthly summary
+  const { data: enhancedMonthlySummary } = useQuery<MonthlySummaryEnhanced>({
+    queryKey: ['/api/work-logs/enhanced-summary', currentYear, currentMonth],
+    staleTime: 1000 * 60 * 15, // 15 minutes
+  });
+
   // Update work log mutation
   const updateMutation = useMutation({
     mutationFn: async ({ date, timeSlot, description }: { 
@@ -51,6 +63,8 @@ export function useWorkLog(date: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs/daily-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs/enhanced-summary'] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -84,6 +98,8 @@ export function useWorkLog(date: string) {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs/daily-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs/enhanced-summary'] });
       
       toast({
         title: variables.isHoliday ? "Holiday Set" : "Holiday Removed",
@@ -127,5 +143,7 @@ export function useWorkLog(date: string) {
     updateWorkLog,
     setHolidayStatus,
     monthlySummary,
+    dailySummary,
+    enhancedMonthlySummary,
   };
 }

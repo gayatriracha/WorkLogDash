@@ -7,6 +7,10 @@ import { toast } from "@/hooks/use-toast";
 import TimeSlotCard from "@/components/TimeSlotCard";
 import ProgressRing from "@/components/ProgressRing";
 import AudioNotification from "@/components/AudioNotification";
+import DailySummaryCard from "@/components/DailySummaryCard";
+import EnhancedMonthlySummaryCard from "@/components/EnhancedMonthlySummaryCard";
+import EndOfDayModal from "@/components/EndOfDayModal";
+import { useEndOfDayNotification } from "@/hooks/useEndOfDayNotification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +25,9 @@ export default function Dashboard() {
   
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { currentTime, currentTimeSlot, isWorkHours } = useISTTime();
-  const { workLogs, updateWorkLog, setHolidayStatus, monthlySummary, isLoading } = useWorkLog(dateString);
+  const { workLogs, updateWorkLog, setHolidayStatus, monthlySummary, dailySummary, enhancedMonthlySummary, isLoading } = useWorkLog(dateString);
   const { audioEnabled, toggleAudio, showNotification, closeNotification } = useAudioNotifications();
+  const { showEndOfDayModal, closeModal } = useEndOfDayNotification(dailySummary, dateString);
 
   const isHoliday = workLogs.some(log => log.isHoliday);
 
@@ -203,52 +208,10 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Daily Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Daily Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-muted rounded-lg p-4">
-                  <h4 className="font-medium text-foreground mb-2">Work Areas Covered</h4>
-                  <div className="flex flex-wrap gap-2" data-testid="work-areas">
-                    {/* Generate work area tags from completed logs */}
-                    {workLogs
-                      .filter(log => !log.isHoliday && log.workDescription.trim() !== '')
-                      .map((log, index) => {
-                        // Extract work area from description
-                        const description = log.workDescription.toLowerCase();
-                        let area = 'Other';
-                        if (description.includes('frontend') || description.includes('react')) area = 'Frontend';
-                        else if (description.includes('backend') || description.includes('api')) area = 'Backend';
-                        else if (description.includes('review')) area = 'Code Review';
-                        else if (description.includes('meeting')) area = 'Meeting';
-                        else if (description.includes('documentation')) area = 'Documentation';
-                        
-                        return (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {area}
-                          </Badge>
-                        );
-                      })}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-foreground" data-testid="hours-logged">
-                      {completedSlots}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Hours Logged</div>
-                  </div>
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-primary" data-testid="productivity-percentage">
-                      {progressPercentage}%
-                    </div>
-                    <div className="text-sm text-muted-foreground">Productivity</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Enhanced Daily Summary */}
+            {dailySummary && (
+              <DailySummaryCard summary={dailySummary} date={dateString} />
+            )}
           </div>
 
           {/* Sidebar */}
@@ -283,56 +246,9 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Monthly Summary */}
-            {monthlySummary && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary" data-testid="monthly-productive-hours">
-                      {monthlySummary.totalProductiveHours}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Total Productive Hours</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Working Days</span>
-                      <span className="font-medium text-foreground">
-                        {monthlySummary.workingDays}/{monthlySummary.totalDays}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Holidays</span>
-                      <span className="font-medium text-foreground">
-                        {monthlySummary.holidayDays}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Avg Hours/Day</span>
-                      <span className="font-medium text-foreground">
-                        {monthlySummary.averageHoursPerDay}
-                      </span>
-                    </div>
-                  </div>
-                  {monthlySummary.topWorkAreas.length > 0 && (
-                    <div className="pt-2 border-t border-border">
-                      <h4 className="text-sm font-medium text-foreground mb-2">Top Work Areas</h4>
-                      <div className="space-y-1">
-                        {monthlySummary.topWorkAreas.map((area) => (
-                          <div key={area.area} className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">{area.area}</span>
-                            <span className="font-medium text-foreground">{area.percentage}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* Enhanced Monthly Summary */}
+            {enhancedMonthlySummary && (
+              <EnhancedMonthlySummaryCard summary={enhancedMonthlySummary} />
             )}
           </div>
         </div>
@@ -350,6 +266,13 @@ export default function Dashboard() {
             (currentSlotElement as HTMLTextAreaElement).focus();
           }
         }}
+      />
+
+      <EndOfDayModal
+        isOpen={showEndOfDayModal}
+        onClose={closeModal}
+        dailySummary={dailySummary}
+        date={dateString}
       />
     </div>
   );
