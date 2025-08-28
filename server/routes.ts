@@ -6,7 +6,7 @@ import { insertWorkLogSchema, updateWorkLogSchema, TIME_SLOTS } from "@shared/sc
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
+  // Auth middleware - setupAuth now handles session middleware
   await setupAuth(app);
 
   // Auth routes

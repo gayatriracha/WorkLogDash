@@ -68,31 +68,39 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
-  // For development, let's use a simple authentication bypass
-  // In a real deployment, this would use proper Replit Auth
+  // Set up session middleware first
+  app.use(getSession());
   
-  app.get("/api/login", (req, res) => {
-    // Simulate successful login by creating a session
-    (req.session as any).user = {
-      id: 'dev-user-123',
-      email: 'developer@example.com',
-      firstName: 'Developer',
-      lastName: 'User',
-      profileImageUrl: null
-    };
-    
-    // Create user in database
-    storage.upsertUser({
-      id: 'dev-user-123',
-      email: 'developer@example.com',
-      firstName: 'Developer',
-      lastName: 'User',
-      profileImageUrl: null
-    }).then(() => {
+  app.get("/api/login", async (req, res) => {
+    try {
+      // Ensure session exists
+      if (!req.session) {
+        return res.status(500).json({ message: "Session not initialized" });
+      }
+      
+      // Simulate successful login by creating a session
+      (req.session as any).user = {
+        id: 'dev-user-123',
+        email: 'developer@example.com',
+        firstName: 'Developer',
+        lastName: 'User',
+        profileImageUrl: null
+      };
+      
+      // Create user in database
+      await storage.upsertUser({
+        id: 'dev-user-123',
+        email: 'developer@example.com',
+        firstName: 'Developer',
+        lastName: 'User',
+        profileImageUrl: null
+      });
+      
       res.redirect('/');
-    }).catch(() => {
-      res.redirect('/');
-    });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: "Login failed" });
+    }
   });
 
   app.get("/api/callback", (req, res) => {
@@ -100,9 +108,16 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/logout", (req, res) => {
-    req.session?.destroy(() => {
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Logout error:', err);
+        }
+        res.redirect('/');
+      });
+    } else {
       res.redirect('/');
-    });
+    }
   });
 }
 
